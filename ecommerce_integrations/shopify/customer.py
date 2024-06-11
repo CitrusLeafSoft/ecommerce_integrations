@@ -50,6 +50,17 @@ class ShopifyCustomer(EcommerceCustomer):
 		email: Optional[str] = None,
 	) -> None:
 		"""Create customer address(es) using Customer dict provided by shopify."""
+		#TODO: use frappe.get_doc instead of get_list to check for country in the database
+		if shopify_address.get("country"):
+			country = frappe.db.get_list("Country",filters={'country_name':['=', shopify_address.get("country")]},fields=['country_name'])
+			
+			if len(country)==0:
+				doc = frappe.get_doc({
+					'doctype': 'Country',
+					'country_name': shopify_address.get("country"),
+				})
+				doc.db_insert()
+				frappe.db.commit()
 		address_fields = _map_address_fields(shopify_address, customer_name, address_type, email)
 		super().create_customer_address(address_fields)
 

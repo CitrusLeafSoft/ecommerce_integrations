@@ -300,6 +300,8 @@ def create_items_if_not_exist(order):
 	for item in order.get("line_items", []):
 
 		product_id = item["product_id"]
+		if not product_id:
+			continue
 		variant_id = item.get("variant_id")
 		sku = item.get("sku")
 		product = ShopifyProduct(product_id, variant_id=variant_id, sku=sku)

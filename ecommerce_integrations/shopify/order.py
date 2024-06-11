@@ -28,7 +28,7 @@ DEFAULT_TAX_FIELDS = {
 	"shipping": "default_shipping_charges_account",
 }
 
-
+@frappe.whitelist()
 def sync_sales_order(payload, request_id=None):
 	order = payload
 	frappe.set_user("Administrator")
@@ -45,12 +45,11 @@ def sync_sales_order(payload, request_id=None):
 		if customer_id:
 			customer = ShopifyCustomer(customer_id=customer_id)
 			if not customer.is_synced():
-				customer.sync_customer(customer=shopify_customer)
+				customer.sync_customer(customer=shopify_customer)#country error is from this 
 			else:
 				customer.update_existing_addresses(shopify_customer)
 
 		create_items_if_not_exist(order)
-
 		setting = frappe.get_doc(SETTING_DOCTYPE)
 		create_order(order, setting)
 	except Exception as e:
@@ -80,7 +79,7 @@ def create_sales_order(shopify_order, setting, company=None):
 			customer = frappe.db.get_value("Customer", {CUSTOMER_ID_FIELD: customer_id}, "name")
 
 	so = frappe.db.get_value("Sales Order", {ORDER_ID_FIELD: shopify_order.get("id")}, "name")
-
+	
 	if not so:
 		items = get_order_items(
 			shopify_order.get("line_items"),
@@ -142,7 +141,7 @@ def get_order_items(order_items, setting, delivery_date, taxes_inclusive):
 	product_not_exists = []
 
 	for shopify_item in order_items:
-		if not shopify_item.get("product_exists"):
+		if not shopify_item.get("product_exists") and shopify_item.get("title") != "Customization":
 			all_product_exists = False
 			product_not_exists.append(
 				{"title": shopify_item.get("title"), ORDER_ID_FIELD: shopify_item.get("id")}
@@ -153,7 +152,7 @@ def get_order_items(order_items, setting, delivery_date, taxes_inclusive):
 			item_code = get_item_code(shopify_item)
 			items.append(
 				{
-					"item_code": item_code,
+					"item_code": item_code or shopify_item.get("title"),
 					"item_name": shopify_item.get("name"),
 					"rate": _get_item_price(shopify_item, taxes_inclusive),
 					"delivery_date": delivery_date,
@@ -193,7 +192,7 @@ def _get_total_discount(line_item) -> float:
 	discount_allocations = line_item.get("discount_allocations") or []
 	return sum(flt(discount.get("amount")) for discount in discount_allocations)
 
-
+#calculate freight tax here
 def get_order_taxes(shopify_order, setting, items):
 	taxes = []
 	line_items = shopify_order.get("line_items")
@@ -208,7 +207,7 @@ def get_order_taxes(shopify_order, setting, items):
 					"description": (
 						get_tax_account_description(tax) or f"{tax.get('title')} - {tax.get('rate') * 100.0:.2f}%"
 					),
-					"tax_amount": tax.get("price"),
+					"tax_amount": tax.get("price"), # add freight tax here
 					"included_in_print_rate": 0,
 					"cost_center": setting.cost_center,
 					"item_wise_tax_detail": {item_code: [flt(tax.get("rate")) * 100, flt(tax.get("price"))]},
