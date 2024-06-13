@@ -54,7 +54,7 @@ def create_delivery_note(shopify_order, setting, so):
 			)
 			dn.flags.ignore_mandatory = True
 			dn.save()
-			dn.submit()
+			#dn.submit()
 
 			if shopify_order.get("note"):
 				dn.add_comment(text=f"Order Note: {shopify_order.get('note')}")
