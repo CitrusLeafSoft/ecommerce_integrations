@@ -80,6 +80,7 @@ def create_sales_order(shopify_order, setting, company=None):
 
 	so = frappe.db.get_value("Sales Order", {ORDER_ID_FIELD: shopify_order.get("id")}, "name")
 	
+	print("Is taxes inluded =============", shopify_order.get("taxes_included"))
 	if not so:
 		items = get_order_items(
 			shopify_order.get("line_items"),
@@ -155,6 +156,7 @@ def get_order_items(order_items, setting, delivery_date, taxes_inclusive):
 					"item_code": item_code or shopify_item.get("title"),
 					"item_name": shopify_item.get("name"),
 					"rate": _get_item_price(shopify_item, taxes_inclusive),
+					"custom_tax_inclusive_rate": _get_item_tax_inclusive_price(shopify_item),
 					"delivery_date": delivery_date,
 					"qty": shopify_item.get("quantity"),
 					"stock_uom": shopify_item.get("uom") or "Nos",
@@ -169,7 +171,14 @@ def get_order_items(order_items, setting, delivery_date, taxes_inclusive):
 
 	return items
 
-
+def _get_item_tax_inclusive_price(line_item) -> float:
+    price = flt(line_item.get("price"))
+    qty = cint(line_item.get("quantity"))
+    
+    # remove line item level discounts
+    total_discount = _get_total_discount(line_item)
+    return price - (total_discount / qty)
+    
 def _get_item_price(line_item, taxes_inclusive: bool) -> float:
 
 	price = flt(line_item.get("price"))
@@ -177,14 +186,17 @@ def _get_item_price(line_item, taxes_inclusive: bool) -> float:
 
 	# remove line item level discounts
 	total_discount = _get_total_discount(line_item)
-
+	
+	print("Taxes Inclusive ==========", taxes_inclusive)
+	print("first", price)
+	
 	if not taxes_inclusive:
 		return price - (total_discount / qty)
 
 	total_taxes = 0.0
 	for tax in line_item.get("tax_lines"):
 		total_taxes += flt(tax.get("price"))
-
+	print("second", price)
 	return price - (total_taxes + total_discount) / qty
 
 
