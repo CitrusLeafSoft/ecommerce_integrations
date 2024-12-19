@@ -117,42 +117,52 @@ class ShopifyProduct:
 				item_attr.append("item_attribute_values", {"attribute_value": attr_value, "abbr": attr_value})
 
 	def _create_item(self, product_dict, warehouse, has_variant=0, attributes=None, variant_of=None):
-		item_dict = {
-			"variant_of": variant_of,
-			"is_stock_item": 1,
-			"item_code": cstr(product_dict.get("item_code")) or cstr(product_dict.get("id")),
-			"item_name": product_dict.get("title", "").strip(),
-			"description": product_dict.get("body_html") or product_dict.get("title"),
-			"item_group": self._get_item_group(product_dict.get("product_type")),
-			"has_variants": has_variant,
-			"attributes": attributes or [],
-			"stock_uom": product_dict.get("uom") or _("Nos"),
-			"sku": product_dict.get("sku") or _get_sku(product_dict),
-			"default_warehouse": warehouse,
-			"image": _get_item_image(product_dict),
-			"weight_uom": WEIGHT_TO_ERPNEXT_UOM_MAP[product_dict.get("weight_unit")],
-			"weight_per_unit": product_dict.get("weight"),
-			"default_supplier": self._get_supplier(product_dict),
-		}
+		
+		try:
+			item_dict = {
+				"variant_of": variant_of,
+				"is_stock_item": 1,
+				"item_code": cstr(product_dict.get("item_code")) or cstr(product_dict.get("id")),
+				"item_name": product_dict.get("title", "").strip(),
+				"description": product_dict.get("body_html") or product_dict.get("title"),
+				"item_group": self._get_item_group(product_dict.get("product_type")),
+				"has_variants": has_variant,
+				"attributes": attributes or [],
+				"stock_uom": product_dict.get("uom") or _("Nos"),
+				"sku": product_dict.get("sku") or _get_sku(product_dict),
+				"default_warehouse": warehouse,
+				"image": _get_item_image(product_dict),
+				"image_url": _get_item_image(product_dict),
+				"weight_uom": WEIGHT_TO_ERPNEXT_UOM_MAP[product_dict.get("weight_unit")],
+				"weight_per_unit": product_dict.get("weight"),
+				"default_supplier": self._get_supplier(product_dict),
+			}
+	
+			if(variant_of is not None):
+				item_dict['image'] = frappe.get_value("Item", variant_of, "image", as_dict=True).image
+				item_dict['image_url'] = frappe.get_value("Item", variant_of, "image", as_dict=True).image
 
-		integration_item_code = product_dict["id"]  # shopify product_id
-		variant_id = product_dict.get("variant_id", "")  # shopify variant_id if has variants
-		sku = item_dict["sku"]
+			integration_item_code = product_dict["id"]  # shopify product_id
+			variant_id = product_dict.get("variant_id", "")  # shopify variant_id if has variants
+			sku = item_dict["sku"]
 
-		if not _match_sku_and_link_item(
-			item_dict, integration_item_code, variant_id, variant_of=variant_of, has_variant=has_variant
-		):
-			ecommerce_item.create_ecommerce_item(
-				MODULE_NAME,
-				integration_item_code,
-				item_dict,
-				variant_id=variant_id,
-				sku=sku,
-				variant_of=variant_of,
-				has_variants=has_variant,
-			)
+			if not _match_sku_and_link_item(
+				item_dict, integration_item_code, variant_id, variant_of=variant_of, has_variant=has_variant
+			):
+				ecommerce_item.create_ecommerce_item(
+					MODULE_NAME,
+					integration_item_code,
+					item_dict,
+					variant_id=variant_id,
+					sku=sku,
+					variant_of=variant_of,
+					has_variants=has_variant,
+				)
+		except Exception as e:
+			print(e)
 
 	def _create_item_variants(self, product_dict, warehouse, attributes):
+		
 		template_item = ecommerce_item.get_erpnext_item(
 			MODULE_NAME, integration_item_code=product_dict.get("id"), has_variants=1
 		)
@@ -169,7 +179,7 @@ class ShopifyProduct:
 					"uom": template_item.stock_uom or _("Nos"),
 					"item_price": variant.get("price"),
 					"weight_unit": variant.get("weight_unit"),
-					"weight": variant.get("weight"),
+					"weight": variant.get("weight")
 				}
 
 				for i, variant_attr in enumerate(SHOPIFY_VARIANTS_ATTR_LIST):
