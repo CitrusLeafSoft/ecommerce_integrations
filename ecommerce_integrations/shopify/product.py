@@ -52,10 +52,9 @@ class ShopifyProduct:
 
 	@temp_shopify_session
 	def sync_product(self):
-		if not self.is_synced():
-			shopify_product = Product.find(self.product_id)
-			product_dict = shopify_product.to_dict()
-			self._make_item(product_dict)
+		shopify_product = Product.find(self.product_id)
+		product_dict = shopify_product.to_dict()
+		self._make_item(product_dict)
 
 	def _make_item(self, product_dict):
 		_add_weight_details(product_dict)
@@ -117,7 +116,6 @@ class ShopifyProduct:
 				item_attr.append("item_attribute_values", {"attribute_value": attr_value, "abbr": attr_value})
 
 	def _create_item(self, product_dict, warehouse, has_variant=0, attributes=None, variant_of=None):
-		
 		try:
 			item_dict = {
 				"variant_of": variant_of,
@@ -316,8 +314,8 @@ def create_items_if_not_exist(order):
 		sku = item.get("sku")
 		product = ShopifyProduct(product_id, variant_id=variant_id, sku=sku)
 
-		if not product.is_synced():
-			product.sync_product()
+		#if not product.is_synced():
+		product.sync_product()
 
 
 def get_item_code(shopify_item):

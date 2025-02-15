@@ -141,8 +141,8 @@ def create_ecommerce_item(
 	# SKU not allowed for template items
 	sku = cstr(sku) if not has_variants else None
 
-	if is_synced(integration, integration_item_code, variant_id, sku):
-		return
+	# if is_synced(integration, integration_item_code, variant_id, sku):
+	# 	return
 
 	# crete default item
 	item = {
@@ -156,20 +156,40 @@ def create_ecommerce_item(
 
 	new_item = frappe.get_doc(item)
 	new_item.flags.from_integration = True
-	new_item.insert(ignore_permissions=True, ignore_mandatory=True)
 
-	ecommerce_item = frappe.get_doc(
-		{
-			"doctype": "Ecommerce Item",
+	if(frappe.db.exists("Item", item['item_code'])):
+		new_item = frappe.get_doc("Item", item['item_code'])
+		item.pop("item_code", None)
+		new_item.update(item);
+		new_item.save(ignore_permissions=True)
+	else:
+		new_item.insert(ignore_permissions=True, ignore_mandatory=True)	
+
+
+	if(frappe.db.exists("Ecommerce Item", {"erpnext_item_code": new_item.name})):
+		ecom_item_name = frappe.db.get_value('Ecommerce Item', {"erpnext_item_code": new_item.name}, ['name'])
+		ecommerce_item = frappe.get_doc("Ecommerce Item", ecom_item_name)
+		ecommerce_item.update({
 			"integration": integration,
-			"erpnext_item_code": new_item.name,
-			"integration_item_code": integration_item_code,
 			"has_variants": has_variants,
 			"variant_id": cstr(variant_id),
 			"variant_of": cstr(variant_of),
 			"sku": sku,
 			"item_synced_on": now(),
-		}
-	)
-
-	ecommerce_item.insert()
+		})
+		ecommerce_item.save(ignore_permissions=True)
+	else:
+		ecommerce_item = frappe.get_doc(
+			{
+				"doctype": "Ecommerce Item",
+				"integration": integration,
+				"erpnext_item_code": new_item.name,
+				"integration_item_code": integration_item_code,
+				"has_variants": has_variants,
+				"variant_id": cstr(variant_id),
+				"variant_of": cstr(variant_of),
+				"sku": sku,
+				"item_synced_on": now(),
+			}
+		)
+		ecommerce_item.insert()

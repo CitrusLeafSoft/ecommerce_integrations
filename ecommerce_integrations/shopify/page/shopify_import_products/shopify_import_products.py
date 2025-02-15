@@ -15,6 +15,19 @@ REALTIME_KEY = "shopify.key.sync.all.products"
 
 
 @frappe.whitelist()
+def get_shopify_product_by_id(id):
+	products =[]
+	product = _fetch_product_by_id_from_shopify(id)
+	if product:
+		d = product.to_dict()
+		d["synced"] = is_synced(product.id)
+		products.append(d)
+
+	return {
+		"products": products
+	}
+
+@frappe.whitelist()
 def get_shopify_products(from_=None):
 	shopify_products = fetch_all_products(from_)
 	return shopify_products
@@ -45,6 +58,9 @@ def fetch_all_products(from_=None):
 		"prevUrl": prev_url,
 	}
 
+@temp_shopify_session
+def _fetch_product_by_id_from_shopify(id):
+	return Product.find(id)
 
 @temp_shopify_session
 def _fetch_products_from_shopify(from_=None, limit=20):

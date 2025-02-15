@@ -33,7 +33,7 @@ shopify.ProductImporter = class {
 	}
 
 	async checkSyncStatus() {
-		const jobs = await frappe.db.get_list("RQ Job", {filters: {"status": ("in", ("queued", "started"))}});
+		const jobs = await frappe.db.get_list("RQ Job", { filters: { "status": ("in", ("queued", "started")) } });
 		this.syncRunning = jobs.find(job => job.job_name == 'shopify.job.sync.all.products') !== undefined;
 
 		if (this.syncRunning) {
@@ -50,6 +50,10 @@ shopify.ProductImporter = class {
                 <div class="col-lg-8 d-flex align-items-stretch">
                     <div class="card border-0 shadow-sm p-3 mb-3 w-100 rounded-sm" style="background-color: var(--card-bg)">
                         <h5 class="border-bottom pb-2">Products in Shopify</h5>
+						<div class="ml-1 row mb-2">
+							<input class="form-control col-sm-6" id="search" style="width:40%">
+							<button type="button" id="btn-search" class="ml-3 col-sm-4 btn btn-primary py-2">Search</button>
+						</div>
                         <div id="shopify-product-list">
                             <div class="text-center">Loading...</div>
                         </div>
@@ -128,12 +132,12 @@ shopify.ProductImporter = class {
 					name: 'ID',
 					align: 'left',
 					editable: false,
-					focusable: false,
+					focusable: true,
 				},
 				{
 					name: 'Name',
 					editable: false,
-					focusable: false,
+					focusable: true,
 				},
 				{
 					name: 'SKUs',
@@ -174,9 +178,9 @@ shopify.ProductImporter = class {
 				'Name': product.title,
 				'SKUs': product.variants && product.variants.map(a => `${a.sku}`).join(', '),
 				'Status': this.getProductSyncStatus(product.synced),
-                'Action': !product.synced ?
-                    `<button type="button" class="btn btn-default btn-xs btn-sync mx-2" data-product="${product.id}"> Sync </button>` :
-                    `<button type="button" class="btn btn-default btn-xs btn-resync mx-2" data-product="${product.id}"> Re-sync </button>`,
+				'Action': !product.synced ?
+					`<button type="button" class="btn btn-default btn-xs btn-sync mx-2" data-product="${product.id}"> Sync </button>` :
+					`<button type="button" class="btn btn-default btn-xs btn-resync mx-2" data-product="${product.id}"> Re-sync </button>`,
 			}));
 
 			return shopifyProducts;
@@ -195,6 +199,16 @@ shopify.ProductImporter = class {
 	}
 
 	listen() {
+
+		this.wrapper.on('click', '#btn-search', e => {
+			const _this = $(e.currentTarget);
+			const id = $('#search').val();
+			console.log(id)
+			if (id === "") return;
+			const shopifyProducts = this.getProductById(id).then(data => {
+				this.shopifyProductTable.refresh(data)
+			})
+		})
 
 		// sync a product from table
 		this.wrapper.on('click', '.btn-sync', e => {
@@ -217,38 +231,38 @@ shopify.ProductImporter = class {
 						.find('.indicator-pill')
 						.replaceWith(this.getProductSyncStatus(true));
 
-                    _this.replaceWith(`<button type="button" class="btn btn-default btn-xs btn-resync mx-2" data-product="${product}"> Re-sync </button>`);
+					_this.replaceWith(`<button type="button" class="btn btn-default btn-xs btn-resync mx-2" data-product="${product}"> Re-sync </button>`);
 
 				});
 
 		});
 
-        this.wrapper.on('click', '.btn-resync', e => {
-            const _this = $(e.currentTarget);
+		this.wrapper.on('click', '.btn-resync', e => {
+			const _this = $(e.currentTarget);
 
-            _this.prop('disabled', true).text('Syncing...');
+			_this.prop('disabled', true).text('Syncing...');
 
-            const product = _this.attr('data-product');
-            this.resyncProduct(product)
-                .then(status => {
+			const product = _this.attr('data-product');
+			this.resyncProduct(product)
+				.then(status => {
 
-                    if (!status) {
-                        frappe.throw(__('Error syncing product'));
-                        return;
-                    }
+					if (!status) {
+						frappe.throw(__('Error syncing product'));
+						return;
+					}
 
-                    _this.parents('.dt-row')
-                        .find('.indicator-pill')
-                        .replaceWith(this.getProductSyncStatus(true));
+					_this.parents('.dt-row')
+						.find('.indicator-pill')
+						.replaceWith(this.getProductSyncStatus(true));
 
-                        _this.prop('disabled', false).text('Re-sync');
+					_this.prop('disabled', false).text('Re-sync');
 
-                })
-                .catch(ex => {
-                    _this.prop('disabled', false).text('Re-sync');
-                    frappe.throw(__('Error syncing Product'));
-                });
-        });
+				})
+				.catch(ex => {
+					_this.prop('disabled', false).text('Re-sync');
+					frappe.throw(__('Error syncing Product'));
+				});
+		});
 
 		// pagination
 		this.wrapper.on('click', '.btn-prev,.btn-next', e => this.switchPage(e));
@@ -256,6 +270,29 @@ shopify.ProductImporter = class {
 		// sync all products
 		this.wrapper.on('click', '#btn-sync-all', e => this.syncAll(e));
 
+	}
+
+	async getProductById(id) {
+		const { message: { products } } = await frappe.call({
+			method: 'ecommerce_integrations.shopify.page.shopify_import_products.shopify_import_products.get_shopify_product_by_id',
+			args: { id }
+		});
+
+
+		const shopifyProducts = products.map((product) => ({
+			// 'Image': product.image && product.image.src && `<img style="height: 50px" src="${product.image.src}">`,
+			'ID': product.id,
+			'Name': product.title,
+			'SKUs': product.variants && product.variants.map(a => `${a.sku}`).join(', '),
+			'Status': this.getProductSyncStatus(product.synced),
+			'Action': !product.synced ?
+				`<button type="button" class="btn btn-default btn-xs btn-sync mx-2" data-product="${product.id}"> Sync </button>` :
+				`<button type="button" class="btn btn-default btn-xs btn-resync mx-2" data-product="${product.id}"> Re-sync </button>`,
+		}));
+
+		return shopifyProducts;
+
+		return [shopifyProducts];
 	}
 
 	async syncProduct(product) {
@@ -272,19 +309,19 @@ shopify.ProductImporter = class {
 
 	}
 
-    async resyncProduct(product) {
+	async resyncProduct(product) {
 
-        const { message: status } = await frappe.call({
-            method: 'ecommerce_integrations.shopify.page.shopify_import_products.shopify_import_products.resync_product',
-            args: { product },
-        });
+		const { message: status } = await frappe.call({
+			method: 'ecommerce_integrations.shopify.page.shopify_import_products.shopify_import_products.resync_product',
+			args: { product },
+		});
 
-        if (status)
-            this.fetchProductCount();
+		if (status)
+			this.fetchProductCount();
 
-        return status;
+		return status;
 
-    }
+	}
 
 	async switchPage({ currentTarget }) {
 
